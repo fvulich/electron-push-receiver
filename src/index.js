@@ -1,4 +1,4 @@
-const { register, listen } = require('push-receiver');
+const { register, listen } = require('push-receiver-v2');
 const { ipcMain } = require('electron');
 const Config = require('electron-config');
 const {
@@ -26,11 +26,20 @@ let started = false;
 // To be call from the main process
 function setup(webContents) {
   // Will be called by the renderer process
-  ipcMain.on(START_NOTIFICATION_SERVICE, async (_, senderId) => {
+  ipcMain.on(START_NOTIFICATION_SERVICE, async (_, appID, projectID, apiKey, vapidKey) => {
+    const config = {
+      firebase: {
+        apiKey,
+        appID,
+        projectID
+      },
+      vapidKey
+    };
+    console.log('PUSH_RECEIVER:::Starting the service', config);
     // Retrieve saved credentials
     let credentials = config.get('credentials');
     // Retrieve saved senderId
-    const savedSenderId = config.get('senderId');
+    // const savedSenderId = config.get('senderId');
     if (started) {
       webContents.send(NOTIFICATION_SERVICE_STARTED, (credentials.fcm || {}).token);
       return;
@@ -40,8 +49,9 @@ function setup(webContents) {
       // Retrieve saved persistentId : avoid receiving all already received notifications on start
       const persistentIds = config.get('persistentIds') || [];
       // Register if no credentials or if senderId has changed
-      if (!credentials || savedSenderId !== senderId) {
-        credentials = await register(senderId);
+      if (!credentials) {
+        credentials = await register(config);
+        console.log('PUSH_RECEIVER:::Credentials received', credentials);
         // Save credentials for later use
         config.set('credentials', credentials);
         // Save senderId
